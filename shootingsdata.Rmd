@@ -1,0 +1,92 @@
+---
+title: "NYC Shooting Dataset"
+author: "BrianH"
+date: "2023-07-30"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#load all libraries
+library(tinytex)
+library(lubridate)
+library(ggplot2)
+library(stringr)
+library(dplyr)
+library(tidyverse)
+```
+
+## Introduction
+
+
+This is a breakdown of an NYC Shooting dataset based on incidents across boroughs and demographics. The dataset includes data starting from 2006 onwards. For the sake of this analysis, focus will be placed on the distribution over time of crime occurrences within each New York borough.
+
+
+```{r shootings}
+url_in <- "https://data.cityofnewyork.us/api/views/833y-fsy8/"
+file_names <- c("rows.csv")
+url <- str_c(url_in,file_names)
+shootings <- read_csv(url)
+
+summary(shootings)
+```
+
+## Importing Data
+
+To breakdown the data and get a more nuanced view, we're generating a simplified chart with only occurrence date, borough, and crime count to determine the amount of crimes committed per day based on the borough where the crime occurred. Null values are kept in this view to account for days in which no crimes are reported in the respective borough.
+
+```{r chart}
+tidy_shootings <- shootings %>%
+  mutate(OCCUR_DATE = as.Date(OCCUR_DATE, format = "%m/%d/%Y")) %>%
+  group_by(BORO, OCCUR_DATE) %>%
+  summarize(count = n()) %>%
+  pivot_wider(names_from = BORO, values_from = count) %>% 
+  mutate("Total Shootings" = rowSums(.[, -1], na.rm = TRUE))
+
+head(tidy_shootings)
+```
+
+## Exploratory Data Analysis
+
+By introducing a plot of crimes committed per borough over the time period of the dataset, we're able to spot peaks in shootings towards the early 2010s, as well as an increase around 2020/2021. The highest amount of shootings occurred at this time as well.
+
+```{r graph}
+tidy_shootings %>% 
+    gather(key = "Borough", value = "Count", -OCCUR_DATE) %>% 
+    ggplot(aes(x = OCCUR_DATE, y = Count, color = Borough)) +
+    geom_smooth() +
+    labs(title = "NYC Shootings by Borough", x = "Date", y = "Count")
+```
+
+Alongside the peak that's noticed in Total Shootings, it's worth noting that of the boroughs in which shootings had upward movement—Brooklyn, Manhattan, and the Bronx—two of the boroughs stand as the lowest medium household income areas within the city.
+
+Having this context, it was worth looking into what caused the peak to occur. 
+
+To approach more granular data, I looked into the specific dates with the most shootings in NYC.
+<br>
+<br>
+```{r topdates}
+sorted_data <- shootings %>%
+  group_by(OCCUR_DATE) %>%
+  summarize(total_shootings = n()) %>%
+  arrange(desc(total_shootings))
+
+sorted_data %>%
+  arrange(desc(total_shootings)) %>%
+  head(10) %>%
+  mutate(OCCUR_DATE = factor(OCCUR_DATE, levels = unique(OCCUR_DATE))) %>%
+  ggplot(aes(x = OCCUR_DATE, y = total_shootings)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Date", y = "Total Shootings", title = "Top 10 Dates with Most Shootings (Descending Order)")
+
+```
+
+As seen on the chart above sorting the dataset dates by most shootings, it seems that 3 of the top 10 dates occurred within a 2-month period in 2020. During this period, economic downturn and COVID rates, as well as protests, could have contributed to the increase in shootings throughout the city.
+
+
+
+## Conclusion / Bias Identification
+
+In the analysis of the NYC shootings data, focus was primarily on understanding the distribution of shooting incidents among different boroughs. This approach allowed us to explore potential disparities in crime rates and safety concerns across various areas of the city. By examining the frequency of shootings within each borough, we aimed to gain insights into the socioeconomic dynamics and potential factors contributing to variations in crime incidents.
+
+It's important to note that the analysis did not include racial information as part of this specific examination. While race is a significant societal factor that can influence crime patterns, its inclusion in this analysis could potentially lead to unintended biases or misinterpretations.
